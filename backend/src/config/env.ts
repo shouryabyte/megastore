@@ -28,4 +28,5 @@ const OriginSchema = z.string().url();
 export const frontendOrigins = env.FRONTEND_URL.split(",")
   .map((s) => s.trim())
   .filter(Boolean)
-  .map((o) => OriginSchema.parse(o));
+  // Normalize to origin so entries like "https://app.vercel.app/" match request Origin "https://app.vercel.app".
+  .map((o) => new URL(OriginSchema.parse(o)).origin);
