@@ -4,6 +4,7 @@ import { User } from "../models/User.js";
 import { Vendor } from "../models/Vendor.js";
 import { signAccessToken, signRefreshToken, type JwtRole } from "../utils/jwt.js";
 import { slugify } from "../utils/slug.js";
+import { hashRefreshToken, verifyRefreshToken } from "../utils/refreshTokenHash.js";
 
 async function ensureVendorLink(user: any) {
   if (user.role !== "Vendor") return;
@@ -27,8 +28,7 @@ export async function registerCustomer(input: { name: string; email: string; pas
   });
   const access = signAccessToken({ sub: user._id.toString(), role: user.role, tokenVersion: user.tokenVersion });
   const refresh = signRefreshToken({ sub: user._id.toString(), role: user.role, tokenVersion: user.tokenVersion });
-  const refreshTokenHash = await bcrypt.hash(refresh, 12);
-  user.refreshTokenHash = refreshTokenHash;
+  user.refreshTokenHash = hashRefreshToken(refresh);
   user.refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await user.save();
   return { user: sanitizeUser(user), access, refresh };
@@ -66,8 +66,7 @@ export async function registerVendor(input: { name: string; email: string; passw
     vendorId: vendor._id.toString(),
     tokenVersion: user.tokenVersion
   });
-  const refreshTokenHash = await bcrypt.hash(refresh, 12);
-  user.refreshTokenHash = refreshTokenHash;
+  user.refreshTokenHash = hashRefreshToken(refresh);
   user.refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await user.save();
   return { user: sanitizeUser(user), vendor, access, refresh };
@@ -94,7 +93,7 @@ export async function login(email: string, password: string) {
     vendorId: user.vendorId?.toString(),
     tokenVersion: user.tokenVersion
   });
-  user.refreshTokenHash = await bcrypt.hash(refresh, 12);
+  user.refreshTokenHash = hashRefreshToken(refresh);
   user.refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await user.save();
   return { user: sanitizeUser(user), access, refresh };
@@ -106,7 +105,7 @@ export async function rotateRefresh(userId: string, refreshToken: string) {
   if (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt.getTime() < Date.now()) {
     throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
   }
-  const match = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+  const match = await verifyRefreshToken(refreshToken, user.refreshTokenHash);
   if (!match) throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
 
   await ensureVendorLink(user);
@@ -123,7 +122,7 @@ export async function rotateRefresh(userId: string, refreshToken: string) {
     vendorId: user.vendorId?.toString(),
     tokenVersion: user.tokenVersion
   });
-  user.refreshTokenHash = await bcrypt.hash(newRefresh, 12);
+  user.refreshTokenHash = hashRefreshToken(newRefresh);
   user.refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await user.save();
   return { user: sanitizeUser(user), access, refresh: newRefresh };

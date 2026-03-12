@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { z } from "zod";
 import { validate } from "../middlewares/validate.middleware.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import mongoose from "mongoose";
 import { createProduct, updateProduct } from "../services/product.service.js";
 import { ensureInventoryForProduct } from "../services/inventory.service.js";
 import { AppError } from "../utils/errors.js";
@@ -39,9 +40,45 @@ export const createVendorProductHandler: RequestHandler[] = [
     const vendorId = req.auth?.vendorId;
     if (!vendorId) throw new AppError("Forbidden", 403, "FORBIDDEN");
     const body = req.validated.body;
-    const product = await createProduct({ vendorId, ...body });
-    await ensureInventoryForProduct({ productId: product._id.toString(), vendorId, sku: body.sku, quantity: body.stock, lowStockThreshold: body.lowStockThreshold });
-    res.status(201).json({ ok: true, productId: product._id.toString(), slug: product.slug });
+
+    const session = await mongoose.startSession();
+    try {
+      let created: any;
+      await session.withTransaction(async () => {
+        created = await createProduct({ vendorId, ...body }, { session });
+        await ensureInventoryForProduct({
+          productId: created._id.toString(),
+          vendorId,
+          sku: body.sku,
+          quantity: body.stock,
+          lowStockThreshold: body.lowStockThreshold,
+          session
+        });
+      });
+      res.status(201).json({ ok: true, productId: created._id.toString(), slug: created.slug });
+    } catch (err: any) {
+      // If transactions are not supported (non-replica Mongo), do a best-effort rollback.
+      const msg = String(err?.message ?? "");
+      if (msg.includes("Transaction numbers are only allowed") || msg.includes("replica set member") || msg.includes("mongos")) {
+        const product = await createProduct({ vendorId, ...body });
+        try {
+          await ensureInventoryForProduct({
+            productId: product._id.toString(),
+            vendorId,
+            sku: body.sku,
+            quantity: body.stock,
+            lowStockThreshold: body.lowStockThreshold
+          });
+          return res.status(201).json({ ok: true, productId: product._id.toString(), slug: product.slug });
+        } catch (e) {
+          await Promise.allSettled([Product.deleteOne({ _id: product._id, vendorId }), Inventory.deleteOne({ productId: product._id, vendorId })]);
+          throw e;
+        }
+      }
+      throw err;
+    } finally {
+      session.endSession();
+    }
   })
 ];
 

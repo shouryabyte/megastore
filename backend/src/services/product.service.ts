@@ -211,7 +211,8 @@ export async function getProductBySlug(slug: string) {
   };
 }
 
-export async function createProduct(input: {
+export async function createProduct(
+  input: {
   vendorId: string;
   categoryId: string;
   title: string;
@@ -224,24 +225,31 @@ export async function createProduct(input: {
   specs?: Record<string, string>;
   compatibility?: string[];
   tags?: string[];
-}) {
+},
+  opts?: { session?: any }
+) {
   const slug = `${slugify(input.title)}-${Date.now().toString(36)}`;
-  const product = await Product.create({
-    vendorId: input.vendorId,
-    categoryId: input.categoryId,
-    title: input.title,
-    slug,
-    brand: input.brand,
-    modelNumber: input.modelNumber,
-    description: input.description,
-    price: input.price,
-    mrp: input.mrp,
-    bulkPricing: (input.bulkPricing ?? []).sort((a, b) => a.minQty - b.minQty),
-    specs: input.specs ?? {},
-    compatibility: input.compatibility ?? [],
-    tags: input.tags ?? []
-  });
-  return product;
+  const docs = await Product.create(
+    [
+      {
+        vendorId: input.vendorId,
+        categoryId: input.categoryId,
+        title: input.title,
+        slug,
+        brand: input.brand,
+        modelNumber: input.modelNumber,
+        description: input.description,
+        price: input.price,
+        mrp: input.mrp,
+        bulkPricing: (input.bulkPricing ?? []).sort((a, b) => a.minQty - b.minQty),
+        specs: input.specs ?? {},
+        compatibility: input.compatibility ?? [],
+        tags: input.tags ?? []
+      }
+    ],
+    opts?.session ? { session: opts.session } : undefined
+  );
+  return docs[0];
 }
 
 export async function updateProduct(vendorId: string, productId: string, patch: Partial<Omit<Parameters<typeof createProduct>[0], "vendorId">>) {

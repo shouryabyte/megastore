@@ -5,16 +5,40 @@ import { AppError } from "../utils/errors.js";
 import { emitGlobal, emitToVendor } from "../sockets/socketHub.js";
 import { notifyVendor } from "./notification.service.js";
 
-export async function ensureInventoryForProduct(input: { productId: string; vendorId: string; sku: string; quantity: number; lowStockThreshold?: number }) {
-  const exists = await Inventory.findOne({ productId: input.productId }).lean();
+export async function ensureInventoryForProduct(input: {
+  productId: string;
+  vendorId: string;
+  sku: string;
+  quantity: number;
+  lowStockThreshold?: number;
+  session?: mongoose.ClientSession;
+}) {
+  const exists = await Inventory.findOne({ productId: input.productId }).session(input.session ?? null).lean();
   if (exists) throw new AppError("Inventory already exists", 409, "INVENTORY_EXISTS");
-  return Inventory.create({
-    productId: input.productId,
-    vendorId: input.vendorId,
-    sku: input.sku,
-    quantity: input.quantity,
-    lowStockThreshold: input.lowStockThreshold ?? 10
-  });
+
+  // Fast pre-check for a nicer error message (still rely on the unique index for race safety).
+  const skuTaken = await Inventory.findOne({ vendorId: input.vendorId, sku: input.sku }).session(input.session ?? null).select("_id").lean();
+  if (skuTaken) throw new AppError("SKU already exists. Please use a unique SKU.", 409, "SKU_CONFLICT");
+
+  try {
+    return await Inventory.create(
+      [
+        {
+          productId: input.productId,
+          vendorId: input.vendorId,
+          sku: input.sku,
+          quantity: input.quantity,
+          lowStockThreshold: input.lowStockThreshold ?? 10
+        }
+      ],
+      input.session ? { session: input.session } : undefined
+    ).then((docs) => docs[0]);
+  } catch (err: any) {
+    if (err?.code === 11000 && (err?.keyPattern?.sku || err?.keyValue?.sku)) {
+      throw new AppError("SKU already exists. Please use a unique SKU.", 409, "SKU_CONFLICT");
+    }
+    throw err;
+  }
 }
 
 export async function updateStock(input: { productId: string; delta: number; reason: string }) {
@@ -82,4 +106,3 @@ export async function reserveAndDecrementForOrder(items: { productId: string; qt
     session.endSession();
   }
 }
-
