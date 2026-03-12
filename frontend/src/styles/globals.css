@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark, premium default theme */
+:root {
+  color-scheme: dark;
+  --background: 222 47% 5%;
+  --foreground: 210 40% 96%;
+  --card: 222 47% 7%;
+  --card-foreground: 210 40% 96%;
+  --border: 215 28% 18%;
+  --input: 215 28% 18%;
+  --ring: 221 83% 60%;
+
+  --primary: 221 83% 60%;
+  --primary-foreground: 222 47% 6%;
+  --secondary: 222 35% 11%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 222 35% 11%;
+  --muted-foreground: 215 20% 70%;
+  --accent: 223 35% 12%;
+  --accent-foreground: 210 40% 96%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 210 40% 96%;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass {
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.bg-grid {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+body {
+  background:
+    radial-gradient(900px 600px at 18% 10%, rgba(59, 130, 246, 0.18), transparent 55%),
+    radial-gradient(900px 600px at 85% 18%, rgba(99, 102, 241, 0.14), transparent 55%),
+    radial-gradient(900px 600px at 70% 80%, rgba(236, 72, 153, 0.10), transparent 55%),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+}

@@ -1,0 +1,16 @@
+{
+  "name": "nexchakra-platform",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "node ./node_modules/concurrently/dist/bin/concurrently.js -n backend,frontend -c cyan,magenta \"npm -C backend run dev\" \"npm -C frontend run dev\"",
+    "build": "npm -C backend run build && npm -C frontend run build",
+    "start": "npm -C backend run start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
